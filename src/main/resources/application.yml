@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: social-media-tracker
+  ai:
+    model:
+      embedding: none
+    vertex:
+      ai:
+        embedding:
+          project-id: central-beach-194106
+          location: us-central1
+        gemini:
+          project-id: central-beach-194106
+          location: us-central1
+          chat:
+            options:
+              model: gemini-2.5-flash
+              temperature: 0.5
+
+bluesky:
+    api:
+      url: https://bsky.social/xrpc
+    auth:
+      username: ${BSKY_USERNAME}
+      password: ${BSKY_PASSWORD}
+
+
+
