@@ -23,12 +23,32 @@ public class CrawlerAgent {
     }
 
     private ResponseEntity<ChatResponse, CrawlerResult> sendMessage(String message, String contextId) {
-        return crawlerChatClient
-                .prompt()
-                .user(message)
-                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, contextId))
-                .call()
-                .responseEntity(CrawlerResult.class);
+        try {
+            log.info("📤 Sending message to Vertex AI Gemini...");
+            log.info("Message: {}", message);
+            log.info("Context ID: {}", contextId);
+
+            ResponseEntity<ChatResponse, CrawlerResult> response = crawlerChatClient
+                    .prompt()
+                    .user(message)
+                    .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, contextId))
+                    .call()
+                    .responseEntity(CrawlerResult.class);
+
+            log.info("✅ Received response from Vertex AI");
+            return response;
+        } catch (Exception e) {
+            log.error("❌ Failed to call Vertex AI Gemini", e);
+            log.error("Error type: {}", e.getClass().getName());
+            log.error("Error message: {}", e.getMessage());
+
+            if (e.getCause() != null) {
+                log.error("Caused by: {}", e.getCause().getClass().getName());
+                log.error("Cause message: {}", e.getCause().getMessage());
+            }
+
+            throw new RuntimeException("Failed to call Vertex AI: " + e.getMessage(), e);
+        }
     }
 
     /**
