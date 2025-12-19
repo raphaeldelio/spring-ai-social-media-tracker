@@ -15,7 +15,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ResponseEntity;
 import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 /**
@@ -59,7 +58,6 @@ public class AgentOrchestrationService {
      * @param threadTs The thread timestamp to reply in
      * @param userMessage The user's request message
      */
-    @Async
     public void processRequest(String teamId, String channel, String threadTs, String userMessage) {
         try {
             logger.info("🚀 Starting agent pipeline for message: {}", userMessage);
@@ -91,11 +89,22 @@ public class AgentOrchestrationService {
 
     private void processCrawlerStage(ConversationState state, String userMessage) {
         // Step 1: Crawler Agent - Fetch data
-        slackService.sendMessage(state.getTeamId(), state.getChannel(), "🔍 Searching for posts...", state.getThreadTs());
+        slackService.sendMessage(state.getTeamId(), state.getChannel(), "🔍 Crawling posts...", state.getThreadTs());
 
-        var crawlerResult = state.getCrawlerResult() != null && state.getConversationId() != null
-                ? crawlerAgent.continueConversation(userMessage, state.getConversationId())
-                : crawlerAgent.runNonInteractive(userMessage);
+        ResponseEntity<ChatResponse, CrawlerResult> crawlerResult = null;
+        try {
+            crawlerResult = state.getCrawlerResult() != null && state.getConversationId() != null
+                    ? crawlerAgent.continueConversation(userMessage, state.getConversationId())
+                    : crawlerAgent.runNonInteractive(userMessage);
+        } catch (Exception e) {
+            logger.error("❌ Crawler agent failed", e);
+            slackService.sendMessage(state.getTeamId(), state.getChannel(),
+                    "❌ Failed to connect to AI service. Please check the logs and try again.\n\n" +
+                    "Error: " + e.getMessage(),
+                    state.getThreadTs());
+            conversationStateManager.removeConversation(state.getTeamId(), state.getChannel(), state.getThreadTs());
+            return;
+        }
 
         if (crawlerResult == null || crawlerResult.entity() == null) {
             slackService.sendMessage(state.getTeamId(), state.getChannel(), "❌ Failed to fetch data. Please try again.", state.getThreadTs());

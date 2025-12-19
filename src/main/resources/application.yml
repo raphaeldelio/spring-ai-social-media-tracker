@@ -1,6 +1,12 @@
 spring:
   application:
     name: social-media-tracker
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      username: ${SPRING_DATA_REDIS_USERNAME:}
+      password: ${SPRING_DATA_REDIS_PASSWORD:}
   ai:
     model:
       embedding: none
@@ -8,14 +14,29 @@ spring:
       ai:
         embedding:
           project-id: central-beach-194106
-          location: us-central1
+          location: europe-west1
         gemini:
           project-id: central-beach-194106
-          location: us-central1
+          location: europe-west1
           chat:
             options:
               model: gemini-2.5-flash
               temperature: 0.5
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+
+logging:
+  level:
+    com.redis.socialmediatracker: INFO
 
 bluesky:
     api:
