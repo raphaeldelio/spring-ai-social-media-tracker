@@ -23,6 +23,7 @@ extra["springAiVersion"] = "1.0.3"
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.ai:spring-ai-starter-model-vertex-ai-gemini")
+    implementation("org.springframework.boot:spring-boot-starter-webflux")
 
     implementation("com.redis.om:redis-om-spring:1.0.4")
     implementation("com.redis.om:redis-om-spring-ai:1.0.4")
@@ -39,4 +40,12 @@ dependencyManagement {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+tasks.named<org.springframework.boot.gradle.tasks.run.BootRun>("bootRun") {
+    jvmArgs = listOf(
+        "--add-opens", "java.base/java.nio.charset=ALL-UNNAMED",
+        "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+        "--add-opens", "java.base/java.util=ALL-UNNAMED"
+    )
 }

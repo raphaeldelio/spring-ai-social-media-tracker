@@ -32,6 +32,9 @@ public class AnalysisAgent {
                 .responseEntity(AnalysisResult.class);
     }
 
+    /**
+     * Run the analysis agent in CLI mode (interactive).
+     */
     public ResponseEntity<ChatResponse, AnalysisResult> run(CrawlerResult crawlerResult) {
         Scanner scanner = new Scanner(System.in);
         String conversationId = UUID.randomUUID().toString();
@@ -54,6 +57,24 @@ public class AnalysisAgent {
         }
 
         scanner.close();
+        log.info("Analysis finished for context {}.", conversationId);
+        return result;
+    }
+
+    /**
+     * Run the analysis agent in non-interactive mode (for Slack/API).
+     */
+    public ResponseEntity<ChatResponse, AnalysisResult> runNonInteractive(CrawlerResult crawlerResult) {
+        String conversationId = UUID.randomUUID().toString();
+
+        log.info("📊 Analysis Agent starting (non-interactive mode)");
+        ResponseEntity<ChatResponse, AnalysisResult> result = sendMessage(crawlerResult, conversationId);
+
+        switch (result.entity().getFinishReason()) {
+            case COMPLETED -> log.info("✅ Analysis Agent completed its task");
+            case ERROR -> log.error("❌ Analysis Agent failed: {}", result.getEntity().getFinishReason());
+        }
+
         log.info("Analysis finished for context {}.", conversationId);
         return result;
     }

@@ -40,6 +40,9 @@ public class ReportAgent {
                 .responseEntity(ReportResult.class);
     }
 
+    /**
+     * Run the report agent in CLI mode (interactive).
+     */
     public ResponseEntity<ChatResponse, ReportResult> run(
             CrawlerResult crawlerResult,
             AnalysisResult analysisResult,
@@ -66,6 +69,28 @@ public class ReportAgent {
         }
 
         scanner.close();
+        log.info("Report generation finished for context {}.", conversationId);
+        return result;
+    }
+
+    /**
+     * Run the report agent in non-interactive mode (for Slack/API).
+     */
+    public ResponseEntity<ChatResponse, ReportResult> runNonInteractive(
+            CrawlerResult crawlerResult,
+            AnalysisResult analysisResult,
+            InsightResult insightResult
+    ) {
+        String conversationId = UUID.randomUUID().toString();
+
+        log.info("📝 Report Agent starting (non-interactive mode)");
+        ResponseEntity<ChatResponse, ReportResult> result = sendMessage(crawlerResult, analysisResult, insightResult, conversationId);
+
+        switch (result.entity().getFinishReason()) {
+            case COMPLETED -> log.info("✅ Report Agent completed its task");
+            case ERROR -> log.error("❌ Report Agent failed: {}", result.getEntity().getFinishReason());
+        }
+
         log.info("Report generation finished for context {}.", conversationId);
         return result;
     }

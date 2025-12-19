@@ -24,5 +24,20 @@ bluesky:
       username: ${BSKY_USERNAME}
       password: ${BSKY_PASSWORD}
 
+slack:
+  client:
+    id: 4058030689.9257277557680
+    secret: 0b15af03f0fc3d31866a944440f18264
+  signing:
+    secret: ${SLACK_SIGNING_SECRET}
+  bot:
+    token: ${SLACK_BOT_TOKEN:}
+  oauth:
+    redirect-uri: ${SLACK_REDIRECT_URI:http://localhost:8080/slack/oauth/callback}
+
+app:
+  cli:
+    enabled: false
+
 
 

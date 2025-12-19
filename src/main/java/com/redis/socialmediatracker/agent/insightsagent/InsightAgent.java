@@ -37,6 +37,9 @@ public class InsightAgent {
                 .responseEntity(InsightResult.class);
     }
 
+    /**
+     * Run the insight agent in CLI mode (interactive).
+     */
     public ResponseEntity<ChatResponse, InsightResult> run(
             CrawlerResult crawlerResult,
             AnalysisResult analysisResult
@@ -62,6 +65,27 @@ public class InsightAgent {
         }
 
         scanner.close();
+        log.info("Insight generation finished for context {}.", conversationId);
+        return result;
+    }
+
+    /**
+     * Run the insight agent in non-interactive mode (for Slack/API).
+     */
+    public ResponseEntity<ChatResponse, InsightResult> runNonInteractive(
+            CrawlerResult crawlerResult,
+            AnalysisResult analysisResult
+    ) {
+        String conversationId = UUID.randomUUID().toString();
+
+        log.info("💡 Insight Agent starting (non-interactive mode)");
+        ResponseEntity<ChatResponse, InsightResult> result = sendMessage(crawlerResult, analysisResult, conversationId);
+
+        switch (result.entity().getFinishReason()) {
+            case COMPLETED -> log.info("✅ Insight Agent completed its task");
+            case ERROR -> log.error("❌ Insight Agent failed: {}", result.getEntity().getFinishReason());
+        }
+
         log.info("Insight generation finished for context {}.", conversationId);
         return result;
     }
