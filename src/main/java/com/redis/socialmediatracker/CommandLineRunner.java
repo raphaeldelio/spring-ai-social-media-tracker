@@ -6,7 +6,6 @@ import com.redis.socialmediatracker.agent.insightsagent.InsightAgent;
 import com.redis.socialmediatracker.agent.reportagent.ReportAgent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -17,16 +16,16 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @ConditionalOnProperty(name = "app.cli.enabled", havingValue = "true", matchIfMissing = false)
-public class Runner implements CommandLineRunner {
+public class CommandLineRunner implements org.springframework.boot.CommandLineRunner {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(Runner.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(CommandLineRunner.class);
 
     private final CrawlerAgent crawlerAgent;
     private final AnalysisAgent analysisAgent;
     private final InsightAgent insightAgent;
     private final ReportAgent reportAgent;
 
-    public Runner(
+    public CommandLineRunner(
             CrawlerAgent crawlerAgent,
             AnalysisAgent analysisAgent,
             InsightAgent insightAgent,

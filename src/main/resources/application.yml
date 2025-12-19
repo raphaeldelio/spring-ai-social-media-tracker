@@ -26,8 +26,8 @@ bluesky:
 
 slack:
   client:
-    id: 4058030689.9257277557680
-    secret: 0b15af03f0fc3d31866a944440f18264
+    id: ${SLACK_CLIENT_ID}
+    secret: ${SLACK_CLIENT_SECRET}
   signing:
     secret: ${SLACK_SIGNING_SECRET}
   bot:
