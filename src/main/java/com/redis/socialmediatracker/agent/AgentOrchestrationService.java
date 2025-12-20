@@ -59,11 +59,16 @@ public class AgentOrchestrationService {
      */
     @Async
     public void processRequest(String teamId, String channel, String threadTs, String userMessage) {
+        ConversationState state = null;
         try {
             logger.info("🚀 Starting agent pipeline for message: {}", userMessage);
 
             // Get or create conversation state
-            ConversationState state = conversationStateManager.getOrCreateConversation(teamId, channel, threadTs);
+            state = conversationStateManager.getOrCreateConversation(teamId, channel, threadTs);
+
+            // Mark as running
+            state.setRunning(true);
+            conversationStateManager.updateConversation(state);
 
             // Determine which stage we're at
             if (state.getCurrentStage() == ConversationState.Stage.CRAWLER) {
@@ -78,6 +83,13 @@ public class AgentOrchestrationService {
 
         } catch (Exception e) {
             logger.error("❌ Error in agent pipeline: {}", e.getMessage(), e);
+
+            // Mark as not running on error
+            if (state != null) {
+                state.setRunning(false);
+                conversationStateManager.updateConversation(state);
+            }
+
             slackService.sendMessage(
                     teamId,
                     channel,
@@ -87,11 +99,63 @@ public class AgentOrchestrationService {
         }
     }
 
+    /**
+     * Resume a conversation from its current stage.
+     * Used for startup recovery to continue interrupted workflows.
+     *
+     * @param state The conversation state to resume
+     */
+    @Async
+    public void resumeConversation(ConversationState state) {
+        try {
+            logger.info("🔄 Resuming conversation {} from stage {}",
+                state.getConversationId(), state.getCurrentStage());
+
+            slackService.sendMessage(
+                state.getTeamId(),
+                state.getChannel(),
+                "🔄 Application restarted. Resuming your request from where we left off...",
+                state.getThreadTs()
+            );
+
+            // Mark as running
+            state.setRunning(true);
+            conversationStateManager.updateConversation(state);
+
+            // Resume from current stage
+            if (state.getCurrentStage() == ConversationState.Stage.ANALYSIS) {
+                processAnalysisStage(state);
+            } else if (state.getCurrentStage() == ConversationState.Stage.INSIGHT) {
+                processInsightStage(state);
+            } else if (state.getCurrentStage() == ConversationState.Stage.REPORT) {
+                processReportStage(state);
+            } else {
+                logger.warn("⚠️ Cannot resume from stage {}, marking as not running", state.getCurrentStage());
+                state.setRunning(false);
+                conversationStateManager.updateConversation(state);
+            }
+
+        } catch (Exception e) {
+            logger.error("❌ Error resuming conversation: {}", e.getMessage(), e);
+
+            // Mark as not running on error
+            state.setRunning(false);
+            conversationStateManager.updateConversation(state);
+
+            slackService.sendMessage(
+                state.getTeamId(),
+                state.getChannel(),
+                "❌ An error occurred while resuming your request: " + e.getMessage(),
+                state.getThreadTs()
+            );
+        }
+    }
+
     private void processCrawlerStage(ConversationState state, String userMessage) {
         // Step 1: Crawler Agent - Fetch data
         slackService.sendMessage(state.getTeamId(), state.getChannel(), "🔍 Crawling Agent is working...", state.getThreadTs());
 
-        ResponseEntity<ChatResponse, CrawlerResult> crawlerResult = null;
+        ResponseEntity<ChatResponse, CrawlerResult> crawlerResult;
         try {
             crawlerResult = state.getCrawlerResult() != null && state.getConversationId() != null
                     ? crawlerAgent.continueConversation(userMessage, state.getConversationId())
@@ -119,6 +183,9 @@ public class AgentOrchestrationService {
             // Store the conversation ID so we can continue
             state.setConversationId(crawlerResult.entity().getConversationId());
             state.setCrawlerResult(crawlerResult.entity());
+
+            // Mark as not running - waiting for user input
+            state.setRunning(false);
             conversationStateManager.updateConversation(state);
             return;
         }
@@ -268,6 +335,11 @@ public class AgentOrchestrationService {
             state.getTotalTokens()
         );
         slackService.sendMessage(state.getTeamId(), state.getChannel(), tokenSummary, state.getThreadTs());
+
+        // Mark as completed and not running
+        state.setCurrentStage(ConversationState.Stage.COMPLETED);
+        state.setRunning(false);
+        conversationStateManager.updateConversation(state);
 
         logger.info("🎉 Agent pipeline completed successfully. Total tokens: {}", state.getTotalTokens());
     }

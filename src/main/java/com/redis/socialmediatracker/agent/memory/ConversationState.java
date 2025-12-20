@@ -46,6 +46,9 @@ public class ConversationState {
     private long lastActivityTimestamp;
 
     @Indexed
+    private boolean isRunning;
+
+    @Indexed
     private CrawlerResult crawlerResultJson;
 
     @Indexed
@@ -57,17 +60,12 @@ public class ConversationState {
     @Indexed
     private com.redis.socialmediatracker.agent.reportagent.ReportResult reportResultJson;
 
-    /**
-     * Default constructor required by Redis OM Spring.
-     */
     public ConversationState() {
         this.currentStage = Stage.CRAWLER;
         this.lastActivityTimestamp = System.currentTimeMillis();
+        this.isRunning = false;
     }
 
-    /**
-     * Constructor for creating a new conversation state.
-     */
     public ConversationState(String conversationId, String teamId, String channel, String threadTs) {
         this.id = createKey(teamId, channel, threadTs);
         this.conversationId = conversationId;
@@ -76,6 +74,7 @@ public class ConversationState {
         this.threadTs = threadTs;
         this.currentStage = Stage.CRAWLER;
         this.lastActivityTimestamp = System.currentTimeMillis();
+        this.isRunning = false;
     }
 
     /**
@@ -140,6 +139,14 @@ public class ConversationState {
 
     public void setLastActivityTimestamp(long lastActivityTimestamp) {
         this.lastActivityTimestamp = lastActivityTimestamp;
+    }
+
+    public boolean isRunning() {
+        return isRunning;
+    }
+
+    public void setRunning(boolean running) {
+        isRunning = running;
     }
 
     public CrawlerResult getCrawlerResult() {

@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * Thread-safe service for deduplicating Slack events using Redis.
@@ -45,19 +46,18 @@ public class EventDeduplicationService {
 
         try {
             // Check if event already exists in Redis
-            ProcessedEvent existingEvent = processedEventRepository.findByEventId(eventId);
+            Optional<ProcessedEvent> existingEvent = processedEventRepository.findById(eventId);
 
-            if (existingEvent == null) {
+            long currentTime = Instant.now().toEpochMilli();
+            if (existingEvent.isEmpty()) {
                 // This is a new event - store it in Redis
-                long currentTime = Instant.now().toEpochMilli();
                 ProcessedEvent newEvent = new ProcessedEvent(eventId, currentTime, eventType, teamId);
                 processedEventRepository.save(newEvent);
 
                 logger.debug("✅ New event: {}", eventId);
                 return true;
             } else {
-                long currentTime = Instant.now().toEpochMilli();
-                long timeSinceFirstSeen = currentTime - existingEvent.getFirstSeenTimestamp();
+                long timeSinceFirstSeen = currentTime - existingEvent.get().getFirstSeenTimestamp();
                 logger.info("🔄 Duplicate event detected: {} (first seen {} ms ago)",
                     eventId, timeSinceFirstSeen);
                 return false;

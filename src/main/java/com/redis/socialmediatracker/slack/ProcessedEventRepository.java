@@ -5,6 +5,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ProcessedEventRepository extends RedisDocumentRepository<ProcessedEvent, String> {
-    ProcessedEvent findByEventId(String eventId);
 }
 
