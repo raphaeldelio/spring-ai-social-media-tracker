@@ -54,6 +54,9 @@ public class ConversationState {
     @Indexed
     private InsightResult insightResultJson;
 
+    @Indexed
+    private com.redis.socialmediatracker.agent.reportagent.ReportResult reportResultJson;
+
     /**
      * Default constructor required by Redis OM Spring.
      */
@@ -161,6 +164,39 @@ public class ConversationState {
 
     public void setInsightResult(InsightResult insightResultJson) {
         this.insightResultJson = insightResultJson;
+    }
+
+    public com.redis.socialmediatracker.agent.reportagent.ReportResult getReportResult() {
+        return reportResultJson;
+    }
+
+    public void setReportResult(com.redis.socialmediatracker.agent.reportagent.ReportResult reportResultJson) {
+        this.reportResultJson = reportResultJson;
+    }
+
+    /**
+     * Calculate total tokens consumed across all agent stages.
+     * Reads token counts from nested result objects.
+     *
+     * @return Total tokens consumed, or 0 if no results available
+     */
+    public Long getTotalTokens() {
+        long total = 0L;
+
+        if (crawlerResultJson != null && crawlerResultJson.getTokens() != null) {
+            total += crawlerResultJson.getTokens();
+        }
+        if (analysisResultJson != null && analysisResultJson.getTokens() != null) {
+            total += analysisResultJson.getTokens();
+        }
+        if (insightResultJson != null && insightResultJson.getTokens() != null) {
+            total += insightResultJson.getTokens();
+        }
+        if (reportResultJson != null && reportResultJson.getTokens() != null) {
+            total += reportResultJson.getTokens();
+        }
+
+        return total;
     }
 
     public void updateActivity() {

@@ -22,6 +22,9 @@ public class CrawlerResult {
     @Indexed
     private FetchedDataResponse finalResponse;
 
+    @Indexed
+    private Long tokens;
+
     public CrawlerResult() {}
 
     public CrawlerResult(FinishReason finishReason, String nextPrompt, FetchedDataResponse finalResponse) {
@@ -74,5 +77,13 @@ public class CrawlerResult {
 
     public void setConversationId(String conversationId) {
         this.conversationId = conversationId;
+    }
+
+    public Long getTokens() {
+        return tokens;
+    }
+
+    public void setTokens(Long tokens) {
+        this.tokens = tokens;
     }
 }

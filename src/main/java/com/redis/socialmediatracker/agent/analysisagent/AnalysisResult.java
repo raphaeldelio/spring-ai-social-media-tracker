@@ -21,6 +21,9 @@ public class AnalysisResult {
     @Indexed
     private List<TopicResult> topics;
 
+    @Indexed
+    private Long tokens;
+
     public AnalysisResult() {}
 
     public AnalysisResult(FinishReason finishReason, String timeframe, List<TopicResult> topics) {
@@ -63,12 +66,21 @@ public class AnalysisResult {
         this.topics = topics;
     }
 
+    public Long getTokens() {
+        return tokens;
+    }
+
+    public void setTokens(Long tokens) {
+        this.tokens = tokens;
+    }
+
     @Override
     public String toString() {
         return "TrendAnalysisResult{" +
                 "finishReason=" + finishReason +
                 ", timeframe='" + timeframe + '\'' +
                 ", topics=" + topics +
+                ", tokens=" + tokens +
                 '}';
     }
 

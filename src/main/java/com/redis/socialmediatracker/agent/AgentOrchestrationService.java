@@ -124,8 +124,16 @@ public class AgentOrchestrationService {
         }
 
         logger.info("✅ Crawler completed");
-        slackService.sendMessage(state.getTeamId(), state.getChannel(), "🔍 Crawling Agent found " + crawlerResult.entity().getFinalResponse().getFetchedData().size() + " posts. Sending them to the Analysis Agent.", state.getThreadTs());
 
+        // Track token usage in the result object
+        Long crawlerTokens = extractTokenUsage(crawlerResult.response());
+        crawlerResult.entity().setTokens(crawlerTokens);
+        logger.info("📊 Crawler used {} tokens", crawlerTokens);
+
+        slackService.sendMessage(state.getTeamId(), state.getChannel(),
+            "🔍 Crawling Agent found " + crawlerResult.entity().getFinalResponse().getFetchedData().size() +
+            " posts. Sending them to the Analysis Agent. (Tokens: " + crawlerTokens + ")",
+            state.getThreadTs());
 
         // Move to next stage
         state.setCrawlerResult(crawlerResult.entity());
@@ -149,8 +157,15 @@ public class AgentOrchestrationService {
         }
 
         logger.info("✅ Analysis completed");
-        slackService.sendMessage(state.getTeamId(), state.getChannel(), "📊 Analysis Agent completed its task. Sending results to the Insights Agent.", state.getThreadTs());
 
+        // Track token usage in the result object
+        Long analysisTokens = extractTokenUsage(analysisResult.response());
+        analysisResult.entity().setTokens(analysisTokens);
+        logger.info("📊 Analysis used {} tokens", analysisTokens);
+
+        slackService.sendMessage(state.getTeamId(), state.getChannel(),
+            "📊 Analysis Agent completed its task. Sending results to the Insights Agent. (Tokens: " + analysisTokens + ")",
+            state.getThreadTs());
 
         // Move to next stage
         state.setAnalysisResult(analysisResult.entity());
@@ -175,8 +190,15 @@ public class AgentOrchestrationService {
         }
 
         logger.info("✅ Insights completed");
-        slackService.sendMessage(state.getTeamId(), state.getChannel(), "💡 Insights Agent completed its task. Sending results to the Report Agent.", state.getThreadTs());
 
+        // Track token usage in the result object
+        Long insightTokens = extractTokenUsage(insightResult.response());
+        insightResult.entity().setTokens(insightTokens);
+        logger.info("📊 Insight used {} tokens", insightTokens);
+
+        slackService.sendMessage(state.getTeamId(), state.getChannel(),
+            "💡 Insights Agent completed its task. Sending results to the Report Agent. (Tokens: " + insightTokens + ")",
+            state.getThreadTs());
 
         // Move to next stage
         state.setInsightResult(insightResult.entity());
@@ -206,8 +228,19 @@ public class AgentOrchestrationService {
         }
 
         logger.info("✅ Report completed");
-        slackService.sendMessage(state.getTeamId(), state.getChannel(), "📝 Report Agent finalized the report. Formatting and sending...", state.getThreadTs());
 
+        // Track token usage in the result object
+        Long reportTokens = extractTokenUsage(reportResult.response());
+        reportResult.entity().setTokens(reportTokens);
+        logger.info("📊 Report used {} tokens", reportTokens);
+
+        slackService.sendMessage(state.getTeamId(), state.getChannel(),
+            "📝 Report Agent finalized the report. Formatting and sending... (Tokens: " + reportTokens + ")",
+            state.getThreadTs());
+
+        // Store report result in state
+        state.setReportResult(reportResult.entity());
+        conversationStateManager.updateConversation(state);
 
         // Step 5: Send final report to Slack
         String slackFormattedReport = SlackReportFormatter.toSlackFormat(reportResult.entity());
@@ -215,7 +248,28 @@ public class AgentOrchestrationService {
         // Split into chunks if too long (Slack has a 4000 char limit per message)
         sendLongMessage(state.getTeamId(), state.getChannel(), state.getThreadTs(), slackFormattedReport);
 
-        logger.info("🎉 Agent pipeline completed successfully");
+        // Send token usage summary
+        Long crawlerTokensSummary = state.getCrawlerResult() != null ? state.getCrawlerResult().getTokens() : null;
+        Long analysisTokensSummary = state.getAnalysisResult() != null ? state.getAnalysisResult().getTokens() : null;
+        Long insightTokensSummary = state.getInsightResult() != null ? state.getInsightResult().getTokens() : null;
+        Long reportTokensSummary = state.getReportResult() != null ? state.getReportResult().getTokens() : null;
+
+        String tokenSummary = String.format(
+            "\n\n📊 *Token Usage Summary*\n" +
+            "• Crawler: %,d tokens\n" +
+            "• Analysis: %,d tokens\n" +
+            "• Insights: %,d tokens\n" +
+            "• Report: %,d tokens\n" +
+            "• *Total: %,d tokens*",
+            crawlerTokensSummary != null ? crawlerTokensSummary : 0,
+            analysisTokensSummary != null ? analysisTokensSummary : 0,
+            insightTokensSummary != null ? insightTokensSummary : 0,
+            reportTokensSummary != null ? reportTokensSummary : 0,
+            state.getTotalTokens()
+        );
+        slackService.sendMessage(state.getTeamId(), state.getChannel(), tokenSummary, state.getThreadTs());
+
+        logger.info("🎉 Agent pipeline completed successfully. Total tokens: {}", state.getTotalTokens());
     }
 
     /**
@@ -223,7 +277,7 @@ public class AgentOrchestrationService {
      */
     private void sendLongMessage(String teamId, String channel, String threadTs, String message) {
         final int MAX_LENGTH = 3900; // Leave some buffer under 4000
-        
+
         if (message.length() <= MAX_LENGTH) {
             slackService.sendMarkdownMessage(teamId, channel, message, threadTs);
             return;
@@ -232,7 +286,7 @@ public class AgentOrchestrationService {
         // Split by sections or paragraphs
         String[] parts = message.split("\n\n");
         StringBuilder currentChunk = new StringBuilder();
-        
+
         for (String part : parts) {
             if (currentChunk.length() + part.length() + 2 > MAX_LENGTH) {
                 slackService.sendMarkdownMessage(teamId, channel, currentChunk.toString(), threadTs);
@@ -240,10 +294,32 @@ public class AgentOrchestrationService {
             }
             currentChunk.append(part).append("\n\n");
         }
-        
+
         if (!currentChunk.isEmpty()) {
             slackService.sendMarkdownMessage(teamId, channel, currentChunk.toString(), threadTs);
         }
+    }
+
+    /**
+     * Extract total token usage from a ChatResponse.
+     * Returns the total tokens (prompt + completion) or 0 if not available.
+     */
+    private Long extractTokenUsage(ChatResponse chatResponse) {
+        if (chatResponse == null) {
+            logger.warn("⚠️ ChatResponse is null, cannot extract token usage");
+            return 0L;
+        }
+
+        try {
+            var usage = chatResponse.getMetadata().getUsage();
+            if (usage != null && usage.getTotalTokens() != null) {
+                return usage.getTotalTokens().longValue();
+            }
+        } catch (Exception e) {
+            logger.warn("⚠️ Failed to extract token usage: {}", e.getMessage());
+        }
+
+        return 0L;
     }
 }
 

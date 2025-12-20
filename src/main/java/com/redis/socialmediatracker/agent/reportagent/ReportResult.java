@@ -20,6 +20,9 @@ public class ReportResult {
     @Indexed
     private Report report;
 
+    @Indexed
+    private Long tokens;
+
     public ReportResult() {}
 
     public ReportResult(FinishReason finishReason, String timeframe, Report report) {
@@ -62,12 +65,21 @@ public class ReportResult {
         this.report = report;
     }
 
+    public Long getTokens() {
+        return tokens;
+    }
+
+    public void setTokens(Long tokens) {
+        this.tokens = tokens;
+    }
+
     @Override
     public String toString() {
         return "ReportResult{" +
                 "finishReason=" + finishReason +
                 ", timeframe='" + timeframe + '\'' +
                 ", report=" + report +
+                ", tokens=" + tokens +
                 '}';
     }
 

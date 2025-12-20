@@ -21,6 +21,9 @@ public class InsightResult {
     @Indexed
     private Insights insights;
 
+    @Indexed
+    private Long tokens;
+
     public InsightResult() {}
 
     public InsightResult(FinishReason finishReason, String timeframe, Insights insights) {
@@ -63,12 +66,21 @@ public class InsightResult {
         this.insights = insights;
     }
 
+    public Long getTokens() {
+        return tokens;
+    }
+
+    public void setTokens(Long tokens) {
+        this.tokens = tokens;
+    }
+
     @Override
     public String toString() {
         return "InsightResult{" +
                 "finishReason=" + finishReason +
                 ", timeframe='" + timeframe + '\'' +
                 ", insights=" + insights +
+                ", tokens=" + tokens +
                 '}';
     }
 
