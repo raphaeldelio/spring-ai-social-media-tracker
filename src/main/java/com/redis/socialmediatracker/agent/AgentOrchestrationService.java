@@ -1,11 +1,9 @@
 package com.redis.socialmediatracker.agent;
 
 import com.redis.socialmediatracker.agent.analysisagent.AnalysisAgent;
-import com.redis.socialmediatracker.agent.analysisagent.AnalysisResult;
 import com.redis.socialmediatracker.agent.collectoragent.CrawlerAgent;
 import com.redis.socialmediatracker.agent.collectoragent.CrawlerResult;
 import com.redis.socialmediatracker.agent.insightsagent.InsightAgent;
-import com.redis.socialmediatracker.agent.insightsagent.InsightResult;
 import com.redis.socialmediatracker.agent.reportagent.ReportAgent;
 import com.redis.socialmediatracker.agent.memory.ConversationState;
 import com.redis.socialmediatracker.agent.memory.ConversationStateManager;
@@ -15,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ResponseEntity;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 /**
@@ -58,6 +57,7 @@ public class AgentOrchestrationService {
      * @param threadTs The thread timestamp to reply in
      * @param userMessage The user's request message
      */
+    @Async
     public void processRequest(String teamId, String channel, String threadTs, String userMessage) {
         try {
             logger.info("🚀 Starting agent pipeline for message: {}", userMessage);
@@ -89,7 +89,7 @@ public class AgentOrchestrationService {
 
     private void processCrawlerStage(ConversationState state, String userMessage) {
         // Step 1: Crawler Agent - Fetch data
-        slackService.sendMessage(state.getTeamId(), state.getChannel(), "🔍 Crawling posts...", state.getThreadTs());
+        slackService.sendMessage(state.getTeamId(), state.getChannel(), "🔍 Crawling Agent is working...", state.getThreadTs());
 
         ResponseEntity<ChatResponse, CrawlerResult> crawlerResult = null;
         try {
@@ -102,13 +102,11 @@ public class AgentOrchestrationService {
                     "❌ Failed to connect to AI service. Please check the logs and try again.\n\n" +
                     "Error: " + e.getMessage(),
                     state.getThreadTs());
-            conversationStateManager.removeConversation(state.getTeamId(), state.getChannel(), state.getThreadTs());
             return;
         }
 
         if (crawlerResult == null || crawlerResult.entity() == null) {
             slackService.sendMessage(state.getTeamId(), state.getChannel(), "❌ Failed to fetch data. Please try again.", state.getThreadTs());
-            conversationStateManager.removeConversation(state.getTeamId(), state.getChannel(), state.getThreadTs());
             return;
         }
 
@@ -120,15 +118,17 @@ public class AgentOrchestrationService {
 
             // Store the conversation ID so we can continue
             state.setConversationId(crawlerResult.entity().getConversationId());
-            state.setCrawlerResult(crawlerResult);
+            state.setCrawlerResult(crawlerResult.entity());
             conversationStateManager.updateConversation(state);
             return;
         }
 
         logger.info("✅ Crawler completed");
+        slackService.sendMessage(state.getTeamId(), state.getChannel(), "🔍 Crawling Agent found " + crawlerResult.entity().getFinalResponse().getFetchedData().size() + " posts. Sending them to the Analysis Agent.", state.getThreadTs());
+
 
         // Move to next stage
-        state.setCrawlerResult(crawlerResult);
+        state.setCrawlerResult(crawlerResult.entity());
         state.setCurrentStage(ConversationState.Stage.ANALYSIS);
         conversationStateManager.updateConversation(state);
 
@@ -137,22 +137,23 @@ public class AgentOrchestrationService {
     }
 
     private void processAnalysisStage(ConversationState state) {
-        var crawlerResult = (ResponseEntity<ChatResponse, CrawlerResult>) state.getCrawlerResult();
+        var crawlerResult = state.getCrawlerResult();
 
         // Step 2: Analysis Agent - Analyze topics
-        slackService.sendMessage(state.getTeamId(), state.getChannel(), "📊 Analyzing topics and trends...", state.getThreadTs());
-        var analysisResult = analysisAgent.runNonInteractive(crawlerResult.entity());
+        slackService.sendMessage(state.getTeamId(), state.getChannel(), "📊 Analysis Agent is analyzing topics and trends...", state.getThreadTs());
+        var analysisResult = analysisAgent.runNonInteractive(crawlerResult);
 
         if (analysisResult == null || analysisResult.entity() == null) {
             slackService.sendMessage(state.getTeamId(), state.getChannel(), "❌ Failed to analyze data. Please try again.", state.getThreadTs());
-            conversationStateManager.removeConversation(state.getTeamId(), state.getChannel(), state.getThreadTs());
             return;
         }
 
         logger.info("✅ Analysis completed");
+        slackService.sendMessage(state.getTeamId(), state.getChannel(), "📊 Analysis Agent completed its task. Sending results to the Insights Agent.", state.getThreadTs());
+
 
         // Move to next stage
-        state.setAnalysisResult(analysisResult);
+        state.setAnalysisResult(analysisResult.entity());
         state.setCurrentStage(ConversationState.Stage.INSIGHT);
         conversationStateManager.updateConversation(state);
 
@@ -161,23 +162,24 @@ public class AgentOrchestrationService {
     }
 
     private void processInsightStage(ConversationState state) {
-        var crawlerResult = (ResponseEntity<ChatResponse, CrawlerResult>) state.getCrawlerResult();
-        var analysisResult = (ResponseEntity<ChatResponse, AnalysisResult>) state.getAnalysisResult();
+        var crawlerResult = state.getCrawlerResult();
+        var analysisResult = state.getAnalysisResult();
 
         // Step 3: Insight Agent - Generate insights
-        slackService.sendMessage(state.getTeamId(), state.getChannel(), "💡 Generating insights...", state.getThreadTs());
-        var insightResult = insightAgent.runNonInteractive(crawlerResult.entity(), analysisResult.entity());
+        slackService.sendMessage(state.getTeamId(), state.getChannel(), "💡 Insights Agent is generating insights...", state.getThreadTs());
+        var insightResult = insightAgent.runNonInteractive(crawlerResult, analysisResult);
 
         if (insightResult == null || insightResult.entity() == null) {
             slackService.sendMessage(state.getTeamId(), state.getChannel(), "❌ Failed to generate insights. Please try again.", state.getThreadTs());
-            conversationStateManager.removeConversation(state.getTeamId(), state.getChannel(), state.getThreadTs());
             return;
         }
 
         logger.info("✅ Insights completed");
+        slackService.sendMessage(state.getTeamId(), state.getChannel(), "💡 Insights Agent completed its task. Sending results to the Report Agent.", state.getThreadTs());
+
 
         // Move to next stage
-        state.setInsightResult(insightResult);
+        state.setInsightResult(insightResult.entity());
         state.setCurrentStage(ConversationState.Stage.REPORT);
         conversationStateManager.updateConversation(state);
 
@@ -186,25 +188,26 @@ public class AgentOrchestrationService {
     }
 
     private void processReportStage(ConversationState state) {
-        var crawlerResult = (ResponseEntity<ChatResponse, CrawlerResult>) state.getCrawlerResult();
-        var analysisResult = (ResponseEntity<ChatResponse, AnalysisResult>) state.getAnalysisResult();
-        var insightResult = (ResponseEntity<ChatResponse, InsightResult>) state.getInsightResult();
+        var crawlerResult = state.getCrawlerResult();
+        var analysisResult = state.getAnalysisResult();
+        var insightResult =  state.getInsightResult();
 
         // Step 4: Report Agent - Create final report
-        slackService.sendMessage(state.getTeamId(), state.getChannel(), "📝 Creating report...", state.getThreadTs());
+        slackService.sendMessage(state.getTeamId(), state.getChannel(), "📝 Report Agent is creating report...", state.getThreadTs());
         var reportResult = reportAgent.runNonInteractive(
-                crawlerResult.entity(),
-                analysisResult.entity(),
-                insightResult.entity()
+                crawlerResult,
+                analysisResult,
+                insightResult
         );
 
         if (reportResult == null || reportResult.entity() == null) {
             slackService.sendMessage(state.getTeamId(), state.getChannel(), "❌ Failed to generate report. Please try again.", state.getThreadTs());
-            conversationStateManager.removeConversation(state.getTeamId(), state.getChannel(), state.getThreadTs());
             return;
         }
 
         logger.info("✅ Report completed");
+        slackService.sendMessage(state.getTeamId(), state.getChannel(), "📝 Report Agent finalized the report. Formatting and sending...", state.getThreadTs());
+
 
         // Step 5: Send final report to Slack
         String slackFormattedReport = SlackReportFormatter.toSlackFormat(reportResult.entity());
@@ -213,9 +216,6 @@ public class AgentOrchestrationService {
         sendLongMessage(state.getTeamId(), state.getChannel(), state.getThreadTs(), slackFormattedReport);
 
         logger.info("🎉 Agent pipeline completed successfully");
-
-        // Clean up conversation state
-        conversationStateManager.removeConversation(state.getTeamId(), state.getChannel(), state.getThreadTs());
     }
 
     /**

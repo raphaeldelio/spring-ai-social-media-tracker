@@ -4,22 +4,30 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Manages conversation state for multi-turn interactions with agents.
- * Stores state in-memory (could be moved to Redis for persistence).
+ * Stores state in Redis using Redis OM Spring for persistence across container restarts.
+ * <p>
+ * Benefits of Redis storage:
+ * - Survives container restarts (important for Cloud Run)
+ * - Automatic TTL (30 minutes) via @Document annotation
+ * - Queryable by team, channel, thread
+ * - Scales horizontally if multiple instances are deployed
  */
 @Service
 public class ConversationStateManager {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(ConversationStateManager.class);
-    private static final long CONVERSATION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-    
-    // Map of (teamId + channel + threadTs) -> ConversationState
-    private final Map<String, ConversationState> activeConversations = new ConcurrentHashMap<>();
-    
+
+    private final ConversationStateRepository conversationStateRepository;
+
+    public ConversationStateManager(ConversationStateRepository conversationStateRepository) {
+        this.conversationStateRepository = conversationStateRepository;
+    }
+
     /**
      * Create a unique key for a conversation based on team, channel, and thread.
      */
@@ -29,67 +37,38 @@ public class ConversationStateManager {
     
     /**
      * Start a new conversation or get existing one.
+     * Looks up in Redis first, creates new if not found or expired.
      */
     public ConversationState getOrCreateConversation(String teamId, String channel, String threadTs) {
         String key = createKey(teamId, channel, threadTs);
-        
-        ConversationState state = activeConversations.get(key);
-        
-        if (state != null) {
-            // Check if conversation has timed out
-            long age = System.currentTimeMillis() - state.getLastActivityTimestamp();
-            if (age > CONVERSATION_TIMEOUT_MS) {
-                logger.info("Conversation {} timed out, creating new one", state.getConversationId());
-                activeConversations.remove(key);
-            } else {
-                state.updateActivity();
-                logger.info("Continuing existing conversation: {}", state.getConversationId());
-                return state;
-            }
+
+        // Try to find existing conversation in Redis
+        Optional<ConversationState> existingState = conversationStateRepository.findById(key);
+
+        if (existingState.isPresent()) {
+            ConversationState state = existingState.get();
+            state.updateActivity();
+            conversationStateRepository.save(state);
+            logger.info("Continuing existing conversation: {} (from Redis)", state.getConversationId());
+            return state;
         }
-        
+
         // Create new conversation
-        String conversationId = java.util.UUID.randomUUID().toString();
-        state = new ConversationState(conversationId, teamId, channel, threadTs);
-        activeConversations.put(key, state);
-        logger.info("Created new conversation: {}", conversationId);
-        
+        String conversationId = UUID.randomUUID().toString();
+        ConversationState state = new ConversationState(conversationId, teamId, channel, threadTs);
+        conversationStateRepository.save(state);
+        logger.info("Created new conversation: {} (saved to Redis)", conversationId);
+
         return state;
     }
     
     /**
-     * Update an existing conversation state.
+     * Update an existing conversation state in Redis.
      */
     public void updateConversation(ConversationState state) {
-        String key = createKey(state.getTeamId(), state.getChannel(), state.getThreadTs());
         state.updateActivity();
-        activeConversations.put(key, state);
-    }
-    
-    /**
-     * Remove a conversation (when completed or cancelled).
-     */
-    public void removeConversation(String teamId, String channel, String threadTs) {
-        String key = createKey(teamId, channel, threadTs);
-        ConversationState removed = activeConversations.remove(key);
-        if (removed != null) {
-            logger.info("Removed conversation: {}", removed.getConversationId());
-        }
-    }
-    
-    /**
-     * Clean up old conversations (should be called periodically).
-     */
-    public void cleanupOldConversations() {
-        long now = System.currentTimeMillis();
-        activeConversations.entrySet().removeIf(entry -> {
-            long age = now - entry.getValue().getLastActivityTimestamp();
-            if (age > CONVERSATION_TIMEOUT_MS) {
-                logger.info("Cleaning up old conversation: {}", entry.getValue().getConversationId());
-                return true;
-            }
-            return false;
-        });
+        conversationStateRepository.save(state);
+        logger.debug("Updated conversation {} in Redis", state.getConversationId());
     }
 }
 

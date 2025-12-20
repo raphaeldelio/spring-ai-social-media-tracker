@@ -1,5 +1,7 @@
 package com.redis.socialmediatracker.agent.reportagent;
 
+import com.redis.om.spring.annotations.Indexed;
+
 import java.util.List;
 
 public class ReportResult {
@@ -9,8 +11,13 @@ public class ReportResult {
         ERROR
     }
 
+    @Indexed
     private FinishReason finishReason;
+
+    @Indexed
     private String timeframe;
+
+    @Indexed
     private Report report;
 
     public ReportResult() {}

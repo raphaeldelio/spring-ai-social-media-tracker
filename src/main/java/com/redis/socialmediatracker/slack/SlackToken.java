@@ -10,7 +10,7 @@ import java.time.Instant;
  * Entity representing a Slack workspace's OAuth tokens stored in Redis.
  * Each workspace that installs the app will have its own token record.
  */
-@Document
+@Document(value = "slack-token", indexName = "slackTokenIdx")
 public class SlackToken {
 
     @Id

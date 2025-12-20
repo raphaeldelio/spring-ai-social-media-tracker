@@ -1,5 +1,7 @@
 package com.redis.socialmediatracker.agent.analysisagent;
 
+import com.redis.om.spring.annotations.Indexed;
+
 import java.util.List;
 import java.util.Map;
 
@@ -10,8 +12,13 @@ public class AnalysisResult {
         ERROR
     }
 
+    @Indexed
     private FinishReason finishReason;
+
+    @Indexed
     private String timeframe;
+
+    @Indexed
     private List<TopicResult> topics;
 
     public AnalysisResult() {}

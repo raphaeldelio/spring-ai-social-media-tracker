@@ -1,5 +1,7 @@
 package com.redis.socialmediatracker.agent.collectoragent;
 
+import com.redis.om.spring.annotations.Indexed;
+
 public class CrawlerResult {
 
     public enum FinishReason {
@@ -8,10 +10,17 @@ public class CrawlerResult {
         ERROR
     }
 
+    @Indexed
     private FinishReason finishReason;
-    private String nextPrompt;     // Used only when NEEDS_MORE_INPUT
-    private String conversationId; // Optional for tracking context
-    private FetchedDataResponse finalResponse; // Used when completed
+
+    @Indexed
+    private String nextPrompt;
+
+    @Indexed
+    private String conversationId;
+
+    @Indexed
+    private FetchedDataResponse finalResponse;
 
     public CrawlerResult() {}
 

@@ -1,5 +1,7 @@
 package com.redis.socialmediatracker.agent.insightsagent;
 
+import com.redis.om.spring.annotations.Indexed;
+
 import java.util.List;
 import java.util.Map;
 
@@ -10,8 +12,13 @@ public class InsightResult {
         ERROR
     }
 
+    @Indexed
     private FinishReason finishReason;
+
+    @Indexed
     private String timeframe;
+
+    @Indexed
     private Insights insights;
 
     public InsightResult() {}
@@ -67,9 +74,16 @@ public class InsightResult {
 
     // Nested classes
     public static class Insights {
+        @Indexed
         private List<Insight> descriptive;
+
+        @Indexed
         private List<Insight> diagnostic;
+
+        @Indexed
         private List<Insight> predictive;
+
+        @Indexed
         private List<Insight> prescriptive;
 
         public Insights() {}
@@ -126,7 +140,10 @@ public class InsightResult {
     }
 
     public static class Insight {
+        @Indexed
         private String statement;
+
+        @Indexed
         private Evidence evidence;
 
         public Insight() {}
@@ -162,11 +179,22 @@ public class InsightResult {
     }
 
     public static class Evidence {
+        @Indexed
         private String topic;
+
+        @Indexed
         private int engagement;
+
+        @Indexed
         private Map<String, Integer> sentimentBreakdown;
+
+        @Indexed
         private List<String> platforms;
-        private List<String> sourceUrls; // ✅ new field
+
+        @Indexed
+        private List<String> sourceUrls;
+
+        @Indexed
         private Map<String, Object> additionalDetails;
 
         public Evidence() {}
