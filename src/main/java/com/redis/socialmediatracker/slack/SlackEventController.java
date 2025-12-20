@@ -85,11 +85,10 @@ public class SlackEventController {
         if ("event_callback".equals(payload.get("type"))) {
             Map<String, Object> event = (Map<String, Object>) payload.get("event");
             String eventType = (String) event.get("type");
+            String teamId = (String) payload.get("team_id");
 
-            // CRITICAL: Check for duplicate events IMMEDIATELY after signature verification
-            // This must happen before any processing to ensure thread-safe deduplication
             String eventId = (String) payload.get("event_id");
-            if (!eventDeduplicationService.isNewEvent(eventId)) {
+            if (!eventDeduplicationService.isNewEvent(eventId, eventType, teamId)) {
                 logger.info("⏭️ Skipping duplicate event: {} (type: {})", eventId, eventType);
                 // Return 200 to acknowledge - we've already processed this
                 return ResponseEntity.ok().build();
@@ -141,7 +140,6 @@ public class SlackEventController {
             return;
         }
 
-        // Process the request asynchronously
         agentOrchestrationService.processRequest(teamId, channel, ts, cleanedText);
     }
 
