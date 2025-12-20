@@ -57,7 +57,6 @@ public class AgentOrchestrationService {
      * @param threadTs The thread timestamp to reply in
      * @param userMessage The user's request message
      */
-    @Async
     public void processRequest(String teamId, String channel, String threadTs, String userMessage) {
         ConversationState state = null;
         try {

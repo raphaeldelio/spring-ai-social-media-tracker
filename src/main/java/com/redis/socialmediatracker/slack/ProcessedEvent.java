@@ -11,7 +11,7 @@ import org.springframework.data.annotation.Id;
  * TTL is set to 1 hour (3600 seconds) - Slack typically retries within minutes,
  * so 1 hour is a safe retention period.
  */
-@Document(value = "processed-event", timeToLive = 3600)
+@Document(value = "processed-event", indexName = "processedEventIdx", timeToLive = 3600)
 public class ProcessedEvent {
     
     /**
